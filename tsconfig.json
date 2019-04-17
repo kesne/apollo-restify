@@ -1,0 +1,13 @@
+{
+    "compilerOptions": {
+        "lib": ["esnext"],
+        "target": "es2016",
+        "esModuleInterop": true,
+        "moduleResolution": "node",
+        "module": "commonjs",
+        "strict": true,
+        "outDir": "lib",
+        "declaration": true,
+        "declarationMap": true
+    }
+}
