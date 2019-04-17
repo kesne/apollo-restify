@@ -65,17 +65,7 @@ export class ApolloServer extends ApolloServerBase {
                 handled = this.handleGraphqlRequestsWithPlayground({ req, res });
             }
 
-            if (!handled) {
-                handled = await this.handleGraphqlRequestsWithServer({ req, res });
-            }
-
-            if (!handled) {
-                this.error({
-                    req,
-                    res,
-                    status: 404
-                });
-            }
+            await this.handleGraphqlRequestsWithServer({ req, res });
         };
     }
 
@@ -88,7 +78,7 @@ export class ApolloServer extends ApolloServerBase {
         req: Request;
         res: Response;
         status: number;
-        error?: Error;
+        error: Error;
     }) {
         if (this.onError) {
             this.onError(req, res, status, error);
@@ -179,32 +169,25 @@ export class ApolloServer extends ApolloServerBase {
     }: {
         req: Request;
         res: Response;
-    }): Promise<boolean> {
-        let handled = false;
-        const url = (req.url || '').split('?')[0];
-        if (url === this.graphqlPath) {
-            const graphqlHandler = graphqlRestify(() => {
-                return this.createGraphQLServerOptions(req, res);
-            });
+    }): Promise<void> {
+        const graphqlHandler = graphqlRestify(() => {
+            return this.createGraphQLServerOptions(req, res);
+        });
 
-            try {
-                const responseData = await graphqlHandler(req, res);
-                res.send(200, responseData);
-            } catch (error) {
-                if ('HttpQueryError' === error.name && error.headers) {
-                    res.set(error.headers);
-                }
-
-                this.error({
-                    req,
-                    res,
-                    error,
-                    status: error.statusCode || 500
-                });
+        try {
+            const responseData = await graphqlHandler(req, res);
+            res.send(200, responseData);
+        } catch (error) {
+            if ('HttpQueryError' === error.name && error.headers) {
+                res.set(error.headers);
             }
 
-            handled = true;
+            this.error({
+                req,
+                res,
+                error,
+                status: error.statusCode || 500
+            });
         }
-        return handled;
     }
 }
