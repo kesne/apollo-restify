@@ -92,8 +92,6 @@ export class ApolloServer extends ApolloServerBase {
     private async handleHealthCheck({
         req,
         res,
-        disableHealthCheck,
-        onHealthCheck
     }: {
         req: Request;
         res: Response;
@@ -102,14 +100,14 @@ export class ApolloServer extends ApolloServerBase {
     }): Promise<boolean> {
         let handled = false;
 
-        if (!disableHealthCheck && req.url === '/.well-known/apollo/server-health') {
+        if (!this.disableHealthCheck && req.url === '/.well-known/apollo/server-health') {
             // Response follows
             // https://tools.ietf.org/html/draft-inadarei-api-health-check-01
             res.header('Content-Type', 'application/health+json');
 
-            if (onHealthCheck) {
+            if (this.onHealthCheck) {
                 try {
-                    await onHealthCheck(req);
+                    await this.onHealthCheck(req);
                 } catch (error) {
                     // NOTE: This doesn't use the error method because the format is well-defined:
                     res.send(503, { status: 'fail' });
