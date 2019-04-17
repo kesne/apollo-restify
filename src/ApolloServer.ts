@@ -69,7 +69,7 @@ export class ApolloServer extends ApolloServerBase {
         if (!disableHealthCheck && req.url === '/.well-known/apollo/server-health') {
             // Response follows
             // https://tools.ietf.org/html/draft-inadarei-api-health-check-01
-            res.setHeader('Content-Type', 'application/health+json');
+            res.header('Content-Type', 'application/health+json');
 
             if (onHealthCheck) {
                 try {
@@ -114,7 +114,7 @@ export class ApolloServer extends ApolloServerBase {
                     subscriptionEndpoint: this.subscriptionsPath,
                     ...this.playgroundOptions
                 };
-                res.setHeader('Content-Type', 'text/html; charset=utf-8');
+                res.header('Content-Type', 'text/html');
                 res.send(200, renderPlaygroundPage(middlewareOptions));
                 handled = true;
             }

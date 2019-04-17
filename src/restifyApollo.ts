@@ -9,7 +9,7 @@ export interface RestifyGraphQLOptionsFunction {
 // Utility function used to set multiple headers on a response object.
 function setHeaders(res: Response, headers: Record<string, any>): void {
     Object.keys(headers).forEach((header: string) => {
-        res.setHeader(header, headers[header]);
+        res.header(header, headers[header]);
     });
 }
 
