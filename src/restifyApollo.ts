@@ -19,24 +19,14 @@ export function graphqlRestify(options: GraphQLOptions | RestifyGraphQLOptionsFu
 
     const graphqlHandler = async (req: Request, res: Response) => {
         const query = req.body.query;
-
-        try {
-            const { graphqlResponse, responseInit } = await runHttpQuery([req, res], {
-                method: req.method!,
-                options,
-                query,
-                request: convertNodeHttpToRequest(req)
-            });
-            res.set(responseInit.headers);
-            return graphqlResponse;
-        } catch (error) {
-            if ('HttpQueryError' === error.name && error.headers) {
-                res.set(error.headers);
-            }
-
-            res.send(error.statusCode || 500, error.message);
-            return undefined;
-        }
+        const { graphqlResponse, responseInit } = await runHttpQuery([req, res], {
+            method: req.method!,
+            options,
+            query,
+            request: convertNodeHttpToRequest(req)
+        });
+        res.set(responseInit.headers);
+        return graphqlResponse;
     };
 
     return graphqlHandler;

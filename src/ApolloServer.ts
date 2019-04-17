@@ -5,21 +5,48 @@ import { parseAll } from 'accept';
 
 import { graphqlRestify } from './restifyApollo';
 
+export type OnHealthCheck = (req: Request) => Promise<any>;
+export type OnError = (req: Request, res: Response, status: number, error?: Error) => any;
+
 export interface ServerRegistration {
     path?: string;
     disableHealthCheck?: boolean;
-    onHealthCheck?: (req: Request) => Promise<any>;
+    onHealthCheck?: OnHealthCheck;
+    onError?: OnError;
 }
 
 export class ApolloServer extends ApolloServerBase {
+    // This integration does not support file uploads.
+    protected supportsUploads(): boolean {
+        return false;
+    }
+
+    // This integration supports subscriptions.
+    protected supportsSubscriptions(): boolean {
+        return true;
+    }
+
     // Extract Apollo Server options from the request.
     async createGraphQLServerOptions(req: Request, res: Response): Promise<GraphQLOptions> {
         return super.graphQLServerOptions({ req, res });
     }
 
+    private disableHealthCheck?: boolean;
+    private onHealthCheck?: OnHealthCheck;
+    private onError?: OnError;
+
     // Prepares and returns an async function that can be used by Micro to handle
     // GraphQL requests.
-    public createHandler({ path, disableHealthCheck, onHealthCheck }: ServerRegistration = {}) {
+    public createHandler({
+        path,
+        disableHealthCheck,
+        onHealthCheck,
+        onError
+    }: ServerRegistration = {}) {
+        this.disableHealthCheck = disableHealthCheck;
+        this.onHealthCheck = onHealthCheck;
+        this.onError = onError;
+
         // We'll kick off the `willStart` right away, so hopefully it'll finish
         // before the first request comes in.
         const promiseWillStart = this.willStart();
@@ -29,26 +56,45 @@ export class ApolloServer extends ApolloServerBase {
 
             await promiseWillStart;
 
-            (await this.handleHealthCheck({
+            let handled = await this.handleHealthCheck({
                 req,
-                res,
-                disableHealthCheck,
-                onHealthCheck
-            })) ||
-                this.handleGraphqlRequestsWithPlayground({ req, res }) ||
-                (await this.handleGraphqlRequestsWithServer({ req, res })) ||
-                res.send(404, null);
+                res
+            });
+
+            if (!handled) {
+                handled = this.handleGraphqlRequestsWithPlayground({ req, res });
+            }
+
+            if (!handled) {
+                handled = await this.handleGraphqlRequestsWithServer({ req, res });
+            }
+
+            if (!handled) {
+                this.error({
+                    req,
+                    res,
+                    status: 404
+                });
+            }
         };
     }
 
-    // This integration does not support file uploads.
-    protected supportsUploads(): boolean {
-        return false;
-    }
-
-    // This integration supports subscriptions.
-    protected supportsSubscriptions(): boolean {
-        return true;
+    private error({
+        req,
+        res,
+        status,
+        error
+    }: {
+        req: Request;
+        res: Response;
+        status: number;
+        error?: Error;
+    }) {
+        if (this.onError) {
+            this.onError(req, res, status, error);
+        } else {
+            res.send(status, error ? error.message : null);
+        }
     }
 
     // If health checking is enabled, trigger the `onHealthCheck`
@@ -75,12 +121,14 @@ export class ApolloServer extends ApolloServerBase {
                 try {
                     await onHealthCheck(req);
                 } catch (error) {
+                    // NOTE: This doesn't use the error method because the format is well-defined:
                     res.send(503, { status: 'fail' });
                     handled = true;
                 }
             }
 
             if (!handled) {
+                // NOTE: This doesn't use the error method because the format is well-defined:
                 res.send(200, { status: 'pass' });
                 handled = true;
             }
@@ -138,8 +186,23 @@ export class ApolloServer extends ApolloServerBase {
             const graphqlHandler = graphqlRestify(() => {
                 return this.createGraphQLServerOptions(req, res);
             });
-            const responseData = await graphqlHandler(req, res);
-            res.send(200, responseData);
+
+            try {
+                const responseData = await graphqlHandler(req, res);
+                res.send(200, responseData);
+            } catch (error) {
+                if ('HttpQueryError' === error.name && error.headers) {
+                    res.set(error.headers);
+                }
+
+                this.error({
+                    req,
+                    res,
+                    error,
+                    status: error.statusCode || 500
+                });
+            }
+
             handled = true;
         }
         return handled;
