@@ -114,8 +114,9 @@ export class ApolloServer extends ApolloServerBase {
                     subscriptionEndpoint: this.subscriptionsPath,
                     ...this.playgroundOptions
                 };
-                res.header('Content-Type', 'text/html');
-                res.send(200, renderPlaygroundPage(middlewareOptions));
+                res.sendRaw(200, renderPlaygroundPage(middlewareOptions), {
+                    'Content-Type': 'text/html'
+                });
                 handled = true;
             }
         }

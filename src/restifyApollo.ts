@@ -6,13 +6,6 @@ export interface RestifyGraphQLOptionsFunction {
     (req?: Request): GraphQLOptions | Promise<GraphQLOptions>;
 }
 
-// Utility function used to set multiple headers on a response object.
-function setHeaders(res: Response, headers: Record<string, any>): void {
-    Object.keys(headers).forEach((header: string) => {
-        res.header(header, headers[header]);
-    });
-}
-
 // Build and return an async function that passes incoming GraphQL requests
 // over to Apollo Server for processing, then fires the results/response back.
 export function graphqlRestify(options: GraphQLOptions | RestifyGraphQLOptionsFunction) {
@@ -34,18 +27,14 @@ export function graphqlRestify(options: GraphQLOptions | RestifyGraphQLOptionsFu
                 query,
                 request: convertNodeHttpToRequest(req)
             });
-            setHeaders(res, responseInit.headers!);
+            res.set(responseInit.headers);
             return graphqlResponse;
         } catch (error) {
             if ('HttpQueryError' === error.name && error.headers) {
-                setHeaders(res, error.headers);
+                res.set(error.headers);
             }
 
-            if (!error.statusCode) {
-                error.statusCode = 500;
-            }
-
-            res.send(error.statusCode, error.message);
+            res.send(error.statusCode || 500, error.message);
             return undefined;
         }
     };
