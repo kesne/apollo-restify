@@ -15,14 +15,11 @@ export {
     // playground
     defaultPlaygroundOptions,
     PlaygroundConfig,
-    PlaygroundRenderPageOptions,
-  } from 'apollo-server-core';
+    PlaygroundRenderPageOptions
+} from 'apollo-server-core';
 
-  export * from 'graphql-tools';
-  export * from 'graphql-subscriptions';
+export * from 'graphql-tools';
+export * from 'graphql-subscriptions';
 
-  // ApolloServer integration.
-  export {
-    ApolloServer,
-    ServerRegistration,
-  } from './ApolloServer';
+// ApolloServer integration.
+export { ApolloServer, ServerRegistration, HEALTH_CHECK_URL } from './ApolloServer';

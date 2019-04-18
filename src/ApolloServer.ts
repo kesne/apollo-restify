@@ -10,10 +10,10 @@ export type OnError = (req: Request, res: Response, status: number, error?: Erro
 
 export interface ServerRegistration {
     path?: string;
-    disableHealthCheck?: boolean;
-    onHealthCheck?: OnHealthCheck;
     onError?: OnError;
 }
+
+export const HEALTH_CHECK_URL = '/.well-known/apollo/server-health';
 
 export class ApolloServer extends ApolloServerBase {
     // This integration does not support file uploads.
@@ -31,22 +31,9 @@ export class ApolloServer extends ApolloServerBase {
         return super.graphQLServerOptions({ req, res });
     }
 
-    private disableHealthCheck?: boolean;
-    private onHealthCheck?: OnHealthCheck;
-    private onError?: OnError;
-
     // Prepares and returns an async function that can be used by Micro to handle
     // GraphQL requests.
-    public createHandler({
-        path,
-        disableHealthCheck,
-        onHealthCheck,
-        onError
-    }: ServerRegistration = {}) {
-        this.disableHealthCheck = disableHealthCheck;
-        this.onHealthCheck = onHealthCheck;
-        this.onError = onError;
-
+    public createHandler({ path, onError }: ServerRegistration = {}) {
         // We'll kick off the `willStart` right away, so hopefully it'll finish
         // before the first request comes in.
         const promiseWillStart = this.willStart();
@@ -56,73 +43,29 @@ export class ApolloServer extends ApolloServerBase {
 
             await promiseWillStart;
 
-            let handled = await this.handleHealthCheck({
-                req,
-                res
-            });
-
-            if (!handled) {
-                handled = this.handleGraphqlRequestsWithPlayground({ req, res });
+            if (!this.handleGraphqlRequestsWithPlayground({ req, res })) {
+                await this.handleGraphqlRequestsWithServer({ req, res, onError });
             }
-
-            await this.handleGraphqlRequestsWithServer({ req, res });
         };
     }
 
-    private error({
-        req,
-        res,
-        status,
-        error
-    }: {
-        req: Request;
-        res: Response;
-        status: number;
-        error: Error;
-    }) {
-        if (this.onError) {
-            this.onError(req, res, status, error);
-        } else {
-            res.send(status, error ? error.message : null);
-        }
-    }
-
-    // If health checking is enabled, trigger the `onHealthCheck`
-    // function when the health check URL is requested.
-    private async handleHealthCheck({
-        req,
-        res,
-    }: {
-        req: Request;
-        res: Response;
-        disableHealthCheck?: boolean;
-        onHealthCheck?: (req: Request) => Promise<any>;
-    }): Promise<boolean> {
-        let handled = false;
-
-        if (!this.disableHealthCheck && req.url === '/.well-known/apollo/server-health') {
+    createHealthCheckHandler({ onHealthCheck }: { onHealthCheck?: OnHealthCheck } = {}) {
+        return async (req: Request, res: Response) => {
             // Response follows
             // https://tools.ietf.org/html/draft-inadarei-api-health-check-01
             res.header('Content-Type', 'application/health+json');
 
-            if (this.onHealthCheck) {
+            if (onHealthCheck) {
                 try {
-                    await this.onHealthCheck(req);
+                    await onHealthCheck(req);
                 } catch (error) {
-                    // NOTE: This doesn't use the error method because the format is well-defined:
                     res.send(503, { status: 'fail' });
-                    handled = true;
+                    return;
                 }
             }
 
-            if (!handled) {
-                // NOTE: This doesn't use the error method because the format is well-defined:
-                res.send(200, { status: 'pass' });
-                handled = true;
-            }
-        }
-
-        return handled;
+            res.send(200, { status: 'pass' });
+        };
     }
 
     // If the `playgroundOptions` are set, register a `graphql-playground` instance
@@ -163,10 +106,12 @@ export class ApolloServer extends ApolloServerBase {
     // Handle incoming GraphQL requests using Apollo Server.
     private async handleGraphqlRequestsWithServer({
         req,
-        res
+        res,
+        onError
     }: {
         req: Request;
         res: Response;
+        onError?: OnError;
     }): Promise<void> {
         const graphqlHandler = graphqlRestify(() => {
             return this.createGraphQLServerOptions(req, res);
@@ -180,12 +125,11 @@ export class ApolloServer extends ApolloServerBase {
                 res.set(error.headers);
             }
 
-            this.error({
-                req,
-                res,
-                error,
-                status: error.statusCode || 500
-            });
+            if (onError) {
+                onError(req, res, error.statusCude || 500, error);
+            } else {
+                res.send(error.statusCode || 500, error.message);
+            }
         }
     }
 }
