@@ -118,8 +118,8 @@ export class ApolloServer extends ApolloServerBase {
         });
 
         try {
-            const responseData = await graphqlHandler(req, res);
-            res.send(200, responseData);
+            const { responseInit, graphqlResponse } = await graphqlHandler(req, res);
+            res.sendRaw(200, graphqlResponse, responseInit.headers);
         } catch (error) {
             if ('HttpQueryError' === error.name && error.headers) {
                 res.set(error.headers);

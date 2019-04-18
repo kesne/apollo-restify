@@ -18,14 +18,12 @@ export function graphqlRestify(options: GraphQLOptions | RestifyGraphQLOptionsFu
     }
 
     const graphqlHandler = async (req: Request, res: Response) => {
-        const { graphqlResponse, responseInit } = await runHttpQuery([req, res], {
+        return runHttpQuery([req, res], {
             method: req.method!,
             options,
             query: req.body,
             request: convertNodeHttpToRequest(req)
         });
-        res.set(responseInit.headers);
-        return graphqlResponse;
     };
 
     return graphqlHandler;
