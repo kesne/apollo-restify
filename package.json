@@ -1,6 +1,6 @@
 {
   "name": "apollo-restify",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "An Apollo Server middleware implementation for restify.",
   "main": "lib/index.js",
   "scripts": {
