@@ -128,7 +128,7 @@ export class ApolloServer extends ApolloServerBase {
             if (onError) {
                 onError(req, res, error.statusCude || 500, error);
             } else {
-                res.send(error.statusCode || 500, error.message);
+                res.sendRaw(error.statusCode || 500, error.message);
             }
         }
     }
